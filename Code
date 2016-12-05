@@ -17,6 +17,7 @@ namespace Challenger_Bot
     {
         DiscordClient discord;
         CommandService commands;
+        DiscordClient client
         
         public MyBot()
         {
