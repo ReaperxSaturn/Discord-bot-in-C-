@@ -1,0 +1,131 @@
+using Discord;
+using Discord.Commands;
+using Discord.Net;
+using Discord.Audio;
+using NAudio;
+using NAudio.Wave;
+using NAudio.CoreAudioApi;
+using System;
+using System.Collections.Generic;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+namespace Challenger_Bot
+{
+    class MyBot
+    {
+        DiscordClient discord;
+        CommandService commands;
+        
+        public MyBot()
+        {
+
+            // connecting status weergeven
+            discord = new DiscordClient(x =>
+            {
+                x.LogLevel = LogSeverity.Info;
+                x.LogHandler = log;
+            });
+
+            var _client = new DiscordClient();
+
+            _client.UsingAudio(x => // Opens an AudioConfigBuilder so we can configure our AudioService
+            {
+                x.Mode = AudioMode.Outgoing; // Tells the AudioService that we will only be sending audio
+            });
+            var voiceChannel = _client.FindServers("Music Bot Server").FirstOrDefault().VoiceChannels.FirstOrDefault(); // Finds the first VoiceChannel on the server 'Music Bot Server'
+
+            var _vClient = await _client.GetService<AudioService>() // We use GetService to find the AudioService that we installed earlier. In previous versions, this was equivelent to _client.Audio()
+                    .Join(VoiceChannel); // Join the Voice Channel, and return the IAudioClient.
+
+            // prefixvoor de commands maken
+            discord.UsingCommands(x =>
+            {
+                x.PrefixChar = '|';
+                x.AllowMentionPrefix = true;
+            });
+   
+
+            //commands make
+            commands = discord.GetService<CommandService>();
+            RegisterPlayCommand();
+
+         commands.CreateCommand("hey")
+                .Do(async (e) =>
+                {
+                    await e.Channel.SendMessage("Suque Madique!,{0}");
+                });
+            // connecten met Discord server
+            discord.ExecuteAndWait(async () =>
+            {
+                await discord.Connect("MjUzMzIyMTM3MDYwNzY5Nzkz.Cx-0qQ.6KNlfgduExKOdtmkAV3rR46WPgk", TokenType.Bot);
+            });
+        }
+        private void RegisterPlayCommand()
+        {
+            /*commands.CreateCommand("play")
+                .Do(async (e) =>
+                {
+                    e.Server.VoiceChannels.Join
+                });*/
+        }
+        public void SendAudio(string filePath)
+        {
+            var channelCount = _client.GetService<AudioService>().Config.Channels; // Get the number of AudioChannels our AudioService has been configured to use.
+            var OutFormat = new WaveFormat(48000, 16, channelCount); // Create a new Output Format, using the spec that Discord will accept, and with the number of channels that our client supports.
+            using (var MP3Reader = new Mp3FileReader(filePath)) // Create a new Disposable MP3FileReader, to read audio from the filePath parameter
+            using (var resampler = new MediaFoundationResampler(MP3Reader, OutFormat)) // Create a Disposable Resampler, which will convert the read MP3 data to PCM, using our Output Format
+            {
+                resampler.ResamplerQuality = 60; // Set the quality of the resampler to 60, the highest quality
+                int blockSize = OutFormat.AverageBytesPerSecond / 50; // Establish the size of our AudioBuffer
+                byte[] buffer = new byte[blockSize];
+                int byteCount;
+
+                while ((byteCount = resampler.Read(buffer, 0, blockSize)) > 0) // Read audio into our buffer, and keep a loop open while data is present
+                {
+                    if (byteCount < blockSize)
+                    {
+                        // Incomplete Frame
+                        for (int i = byteCount; i < blockSize; i++)
+                            buffer[i] = 0;
+                    }
+                    _vClient.Send(buffer, 0, blockSize); // Send the buffer to Discord
+                }
+            }
+
+        }
+        public void SendAudio(string pathOrUrl)
+{
+        var process = Process.Start(new ProcessStartInfo { // FFmpeg requires us to spawn a process and hook into its stdout, so we will create a Process
+                FileName = "ffmpeg",
+                Arguments = $"-i {pathOrUrl} " + // Here we provide a list of arguments to feed into FFmpeg. -i means the location of the file/URL it will read from
+                        "-f s16le -ar 48000 -ac 2 pipe:1", // Next, we tell it to output 16-bit 48000Hz PCM, over 2 channels, to stdout.
+                UseShellExecute = false,
+                RedirectStandardOutput = true // Capture the stdout of the process
+        });
+        Thread.Sleep(2000); // Sleep for a few seconds to FFmpeg can start processing data.
+
+        int blockSize = 3840; // The size of bytes to read per frame; 1920 for mono
+        byte[] buffer = new byte[blockSize];
+        int byteCount;
+
+        while (true) // Loop forever, so data will always be read
+        {
+                byteCount = process.StandardOutput.BaseStream // Access the underlying MemoryStream from the stdout of FFmpeg
+                        .Read(buffer, 0, blockSize); // Read stdout into the buffer
+
+                if (byteCount == 0) // FFmpeg did not output anything
+                        break; // Break out of the while(true) loop, since there was nothing to read.
+
+                _vClient.Send(buffer, 0, byteCount); // Send our data to Discord
+        }
+        _vClient.Wait(); // Wait for the Voice Client to finish sending data, as ffMPEG may have already finished buffering out a song, and it is unsafe to return now.
+}
+
+        private void log(object sender, LogMessageEventArgs e)
+        {
+            Console.WriteLine(e.Message);
+        }
+    }
+}
