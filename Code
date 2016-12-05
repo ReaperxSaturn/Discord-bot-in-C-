@@ -59,7 +59,7 @@ namespace Challenger_Bot
             // connecten met Discord server
             discord.ExecuteAndWait(async () =>
             {
-                await discord.Connect("MjUzMzIyMTM3MDYwNzY5Nzkz.Cx-0qQ.6KNlfgduExKOdtmkAV3rR46WPgk", TokenType.Bot);
+                await discord.Connect("zferfnsgnQTTDYJUY?KGqergitnhomyjLshtghsithndyj", TokenType.Bot);
             });
         }
         private void RegisterPlayCommand()
